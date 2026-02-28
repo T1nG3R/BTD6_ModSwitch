@@ -2,6 +2,8 @@ import sys
 import shutil
 import os
 import winreg
+import subprocess
+import time
 from pathlib import Path
 
 # Script and Backup Paths
@@ -11,6 +13,7 @@ BACKUP_DIR = SCRIPT_DIR / "ModBackup"
 # Official Steam App ID for Bloons TD 6
 APP_ID = "960090"
 
+# Known mod files and directories
 MOD_ITEMS = [
     "Btd6ModHelper",
     "MelonLoader",
@@ -19,6 +22,18 @@ MOD_ITEMS = [
     "UserData",
     "UserLibs",
     "version.dll"
+]
+
+# Known vanilla game files and directories in the root folder
+VANILLA_ITEMS = [
+    "baselib.dll",
+    "BloonsTD6.exe",
+    "BloonsTD6_Data",
+    "Cleaner",
+    "D3D12",
+    "GameAssembly.dll",
+    "UnityCrashHandler64.exe",
+    "UnityPlayer.dll"
 ]
 
 def find_game_directory():
@@ -97,13 +112,53 @@ def set_state(target_state, game_dir):
             
     update_shortcut(target_state)
 
-def launch_game():
+def check_for_unknown_files(game_dir):
+    allowed_items = set(VANILLA_ITEMS + MOD_ITEMS)
+    unknown_files = []
+    
+    for item in game_dir.iterdir():
+        if item.name not in allowed_items:
+            unknown_files.append(item.name)
+            
+    return unknown_files
+
+def is_game_process_running():
+    try:
+        # Check Windows tasklist for the game executable
+        output = subprocess.check_output(["tasklist", "/FI", "IMAGENAME eq BloonsTD6.exe", "/NH"], stderr=subprocess.STDOUT)
+        return b"BloonsTD6.exe" in output
+    except Exception:
+        return False
+
+def launch_game(game_dir):
     print("Action: Launching Bloons TD 6 via Steam...")
     os.system(f"start steam://rungameid/{APP_ID}")
+    
+    unknown_files = check_for_unknown_files(game_dir)
+    
+    if unknown_files:
+        print("\n=======================================")
+        print(" WARNING: UNKNOWN FILES DETECTED")
+        print("=======================================")
+        print("The following items are neither standard vanilla files nor recognized mod files:")
+        for item in unknown_files:
+            print(f" - {item}")
+        print("\nThis window will remain open for your review.")
+        print("It will automatically close when you exit the game.")
+        print("You can also close this window manually at any time.")
+        print("=======================================\n")
+        
+        # Wait 15 seconds to give the game time to launch before monitoring
+        time.sleep(15)
+        
+        # Keep window open while game is running
+        while is_game_process_running():
+            time.sleep(5)
+            
+        print("Info: Game process ended.")
 
 def interactive_menu(game_dir):
     while True:
-        # Clear console screen (works for Windows and Unix)
         os.system('cls' if os.name == 'nt' else 'clear')
         
         current_state = "MODDED" if is_currently_modded(game_dir) else "CLEAN (Vanilla)"
@@ -131,11 +186,11 @@ def interactive_menu(game_dir):
                 input("\nPress Enter to continue...")
             elif choice == '3':
                 set_state("modded", game_dir)
-                launch_game()
+                launch_game(game_dir)
                 break
             elif choice == '4':
                 set_state("clean", game_dir)
-                launch_game()
+                launch_game(game_dir)
                 break
             elif choice == '5':
                 break
@@ -153,11 +208,9 @@ if __name__ == "__main__":
         input("Press Enter to exit...")
         sys.exit(1)
         
-    # If no arguments provided, open the interactive menu
     if len(sys.argv) == 1:
         interactive_menu(game_dir)
     else:
-        # Handle command line arguments from batch files
         arg = sys.argv[1]
         try:
             if arg == "--clean":
@@ -166,10 +219,10 @@ if __name__ == "__main__":
                 set_state("modded", game_dir)
             elif arg == "--play-clean":
                 set_state("clean", game_dir)
-                launch_game()
+                launch_game(game_dir)
             elif arg == "--play-modded":
                 set_state("modded", game_dir)
-                launch_game()
+                launch_game(game_dir)
             else:
                 print("Error: Invalid argument. Use --clean, --modded, --play-clean, or --play-modded.")
                 sys.exit(1)

@@ -23,7 +23,6 @@ MOD_ITEMS = [
 
 def find_game_directory():
     try:
-        # Get Steam root path from Windows Registry
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam")
         steam_path_str, _ = winreg.QueryValueEx(key, "SteamPath")
         winreg.CloseKey(key)
@@ -31,19 +30,16 @@ def find_game_directory():
         steam_path = Path(steam_path_str)
         vdf_path = steam_path / "steamapps" / "libraryfolders.vdf"
         
-        # Check default Steam library first
         default_game_path = steam_path / "steamapps" / "common" / "BloonsTD6"
         if default_game_path.exists():
             return default_game_path
             
-        # Parse libraryfolders.vdf for other drives
         if vdf_path.exists():
             with open(vdf_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     if '"path"' in line.lower():
                         parts = line.split('"')
                         if len(parts) >= 4:
-                            # Fix double backslashes from VDF formatting
                             lib_path_str = parts[3].replace('\\\\', '\\')
                             game_path = Path(lib_path_str) / "steamapps" / "common" / "BloonsTD6"
                             if game_path.exists():
@@ -92,7 +88,7 @@ def set_state(target_state, game_dir):
         if target_state == "clean":
             src = game_dir / item
             dst = BACKUP_DIR / item
-        else: # modded
+        else:
             src = BACKUP_DIR / item
             dst = game_dir / item
             
@@ -105,24 +101,78 @@ def launch_game():
     print("Action: Launching Bloons TD 6 via Steam...")
     os.system(f"start steam://rungameid/{APP_ID}")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ["clean", "modded"]:
-        print("Error: Invalid or missing argument. Use 'clean' or 'modded'.")
-        sys.exit(1)
+def interactive_menu(game_dir):
+    while True:
+        # Clear console screen (works for Windows and Unix)
+        os.system('cls' if os.name == 'nt' else 'clear')
         
-    target = sys.argv[1]
-    
+        current_state = "MODDED" if is_currently_modded(game_dir) else "CLEAN (Vanilla)"
+        
+        print("=======================================")
+        print("          BTD6 Mod Manager             ")
+        print("=======================================")
+        print(f" Current Game State: {current_state}")
+        print("=======================================")
+        print(" [1] Enable Mods (Do not launch)")
+        print(" [2] Disable Mods (Do not launch)")
+        print(" [3] Play Modded")
+        print(" [4] Play Vanilla")
+        print(" [5] Exit")
+        print("=======================================")
+        
+        choice = input("Select an option (1-5): ")
+        
+        try:
+            if choice == '1':
+                set_state("modded", game_dir)
+                input("\nPress Enter to continue...")
+            elif choice == '2':
+                set_state("clean", game_dir)
+                input("\nPress Enter to continue...")
+            elif choice == '3':
+                set_state("modded", game_dir)
+                launch_game()
+                break
+            elif choice == '4':
+                set_state("clean", game_dir)
+                launch_game()
+                break
+            elif choice == '5':
+                break
+            else:
+                print("Error: Invalid choice.")
+                input("\nPress Enter to continue...")
+        except Exception as e:
+            print(f"Error: {e}")
+            input("\nPress Enter to continue...")
+
+if __name__ == "__main__":
     game_dir = find_game_directory()
     if not game_dir:
         print("Error: Could not locate Bloons TD 6 installation directory automatically.")
         input("Press Enter to exit...")
         sys.exit(1)
         
-    print(f"Info: Found game directory at '{game_dir}'")
-    
-    try:
-        set_state(target, game_dir)
-        launch_game()
-    except Exception as e:
-        print(f"Error: {e}")
-        input("Press Enter to exit...")
+    # If no arguments provided, open the interactive menu
+    if len(sys.argv) == 1:
+        interactive_menu(game_dir)
+    else:
+        # Handle command line arguments from batch files
+        arg = sys.argv[1]
+        try:
+            if arg == "--clean":
+                set_state("clean", game_dir)
+            elif arg == "--modded":
+                set_state("modded", game_dir)
+            elif arg == "--play-clean":
+                set_state("clean", game_dir)
+                launch_game()
+            elif arg == "--play-modded":
+                set_state("modded", game_dir)
+                launch_game()
+            else:
+                print("Error: Invalid argument. Use --clean, --modded, --play-clean, or --play-modded.")
+                sys.exit(1)
+        except Exception as e:
+            print(f"Error: {e}")
+            input("Press Enter to exit...")

@@ -1,2 +1,2 @@
 @echo off
-python "%~dp0btd6_modswitch.py" modded
+python "%~dp0btd6_modswitch.py" --play-modded

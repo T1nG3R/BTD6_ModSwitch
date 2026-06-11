@@ -16,6 +16,7 @@ APP_ID = "960090"
 # Known mod files and directories
 MOD_ITEMS = [
     "Btd6ModHelper",
+    "Disabled Mods",
     "MelonLoader",
     "Mods",
     "Plugins",
